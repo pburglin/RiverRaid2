@@ -59,7 +59,7 @@ const fuelReplenishAmount = 25;
 const fuelDisplay = document.getElementById('info');
 const scoreDisplay = document.getElementById('score');
 let score = 0;
-const enemyScoreValue = 10; // Points per enemy destroyed
+const enemyScoreValue = 100; // Points per enemy destroyed
 let distanceTraveled = 0;
 const scoreMultiplier = 0.1; // Adjust for desired score increase rate
 
@@ -400,7 +400,6 @@ function animate() {
                 }
                 enemies.splice(j, 1);
 
-
                 // Add score based on enemy type
                 if (enemy.userData.type === 'helicopter') {
                     score += helicopterScoreValue;
@@ -433,6 +432,7 @@ function animate() {
 
                 // Add score
                 score += bridgeScoreValue;
+                scoreDisplay.textContent = `Score: ${score}`;
 
                 // Since projectile is gone, continue to next projectile
                 continue projectileLoop;
