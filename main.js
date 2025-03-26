@@ -300,11 +300,12 @@ function animate() {
     // Check collision with Enemies
     for (const enemy of enemies) {
         const enemyBox = new THREE.Box3().setFromObject(enemy);
-        if (playerBox.intersectsBox(enemyBox)) {
+        if (playerBox.intersectsBox(enemyBox) && scene.children.includes(enemy)) {
             console.log("Game Over - Hit Enemy!");
             fuelDisplay.textContent = "Game Over - Hit Enemy!"; // Use fuel display for game over message
             clock.stop(); // Stop the game loop
             return; // Stop further processing in this frame
+
         }
     }
 
@@ -392,7 +393,7 @@ function animate() {
                 } else { // Assume turret otherwise
                     score += enemyScoreValue;
                 }
-                // Score display updated later in the loop
+                scoreDisplay.textContent = `Score: ${score}`; // Update score display
 
                 // Since projectile is gone, continue to next projectile
                 continue projectileLoop;
