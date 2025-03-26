@@ -32,11 +32,11 @@ const jetGeometry = new THREE.ConeGeometry(0.5, 2, 8); // Radius, height, segmen
 const jetMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 }); // Red color
 const playerJet = new THREE.Mesh(jetGeometry, jetMaterial);
 playerJet.rotation.x = Math.PI / 2; // Point the cone forward
-playerJet.position.set(0, 1, 5); // Position it slightly above the 'ground' and forward
+playerJet.position.set(0, 0.01, 5); // Position it slightly above the 'ground' and forward
 scene.add(playerJet);
 
 // River
-const riverGeometry = new THREE.PlaneGeometry(10, 1000); // Width, Length
+const riverGeometry = new THREE.PlaneGeometry(20, 1000); // Width, Length
 const riverMaterial = new THREE.MeshStandardMaterial({ color: 0x0000ff, side: THREE.DoubleSide }); // Blue color
 const riverPlane = new THREE.Mesh(riverGeometry, riverMaterial);
 riverPlane.rotation.x = -Math.PI / 2; // Rotate to be horizontal
@@ -86,7 +86,7 @@ const enemyMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 }); // Gr
 
 // Helicopter Enemy Specifics
 const helicopterSpeed = 3; // Horizontal speed
-const helicopterBodySize = { x: 1.5, y: 0.5, z: 0.8 };
+const helicopterBodySize = { x: 1.5, y: 0.01, z: 0.8 };
 const helicopterRotorRadius = 1;
 const helicopterMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa }); // Lighter grey
 const helicopterScoreValue = 25; // Points for destroying a helicopter
@@ -117,7 +117,9 @@ window.addEventListener('resize', () => {
 
 // Player Controls
 const keyboardState = {};
-const playerSpeed = 10; // Units per second
+let playerSpeed = 10; // Units per second
+const accelerationSpeed = 20; // Units per second
+const decelerationRate = 5; // Units per second
 const movementBounds = 4.5; // Initial movement bounds, will be updated dynamically
 
 // Animation loop
@@ -130,7 +132,11 @@ function animate() {
     const delta = clock.getDelta(); // Time since last frame
 
     // --- Camera and Player Forward Movement ---
-    camera.position.z -= scrollSpeed * delta;
+    if (keyboardState['ArrowUp']) {
+        camera.position.z -= (scrollSpeed + playerSpeed) * delta;
+    } else {
+        camera.position.z -= scrollSpeed * delta;
+    }
     playerJet.position.z = camera.position.z - 5; // Keep player fixed distance in front of camera
     camera.lookAt(playerJet.position.x, playerJet.position.y, playerJet.position.z - 10); // Look ahead of the player
 
@@ -145,18 +151,25 @@ function animate() {
     // Update player movement bounds based on current width
     const currentMovementBounds = currentRiverWidth / 2 - 0.5; // Half width minus buffer
 
-
     // Keep river plane centered under the camera view
     riverPlane.position.z = camera.position.z - 50; // Adjust offset as needed
 
-
     // Player Horizontal Movement Logic
     if (keyboardState['ArrowLeft'] || keyboardState['KeyA']) {
-        playerJet.position.x -= playerSpeed * delta;
+        playerJet.position.x -= 5 * delta;
     }
     if (keyboardState['ArrowRight'] || keyboardState['KeyD']) {
-        playerJet.position.x += playerSpeed * delta;
+        playerJet.position.x += 5 * delta;
     }
+    if (keyboardState['ArrowUp']) {
+        playerSpeed += accelerationSpeed * delta;
+        playerJet.position.y += 0.2 * delta;
+    } else {
+        playerSpeed -= decelerationRate * delta;
+        playerSpeed = Math.max(10, playerSpeed);
+    }
+
+    playerJet.position.z -= playerSpeed * delta;
 
     // Clamp player position within bounds
     playerJet.position.x = Math.max(-currentMovementBounds, Math.min(currentMovementBounds, playerJet.position.x));
@@ -269,7 +282,6 @@ function animate() {
         }
     }
 
-
     // --- Collision Detection ---
     const playerBox = new THREE.Box3().setFromObject(playerJet);
 
@@ -339,7 +351,6 @@ function animate() {
         // TODO: Add a more formal game over screen/state
         return; // Stop further processing in this frame
     }
-
 
     // Other game logic updates will go here
 
@@ -436,13 +447,13 @@ function createBankPair(zPos, currentRiverWidth) {
 
     // Left bank
     const leftBank = new THREE.Mesh(bankGeometry, bankMaterial);
-    leftBank.position.set(-(currentRiverWidth / 2 + bankWidth / 2), bankHeight / 2, zPos);
+    leftBank.position.set(-(currentRiverWidth / 2 + bankWidth / 2), bankHeight / 2, zPos); // Corrected bank position
     scene.add(leftBank);
     banks.push(leftBank);
 
     // Right bank
     const rightBank = new THREE.Mesh(bankGeometry, bankMaterial);
-    rightBank.position.set((currentRiverWidth / 2 + bankWidth / 2), bankHeight / 2, zPos);
+    rightBank.position.set((currentRiverWidth / 2 + bankWidth / 2), bankHeight / 2, zPos); // Corrected bank position
     scene.add(rightBank);
     banks.push(rightBank);
 }
@@ -453,7 +464,7 @@ function createFuelDepot(zPos) {
     const fuelDepot = new THREE.Mesh(depotGeometry, depotMaterial);
 
     // Randomly place it left or right within the river bounds (avoiding edges)
-    const xPos = (Math.random() * (riverGeometry.parameters.width - depotRadius * 2)) - (riverGeometry.parameters.width / 2 - depotRadius);
+    const xPos = (Math.random() * (riverGeometry.parameters.width - 2 * depotRadius)) - (riverGeometry.parameters.width / 2 - depotRadius);
     fuelDepot.position.set(xPos, depotHeight / 2, zPos); // Place on the river surface
     scene.add(fuelDepot);
     fuelDepots.push(fuelDepot);
@@ -491,7 +502,7 @@ function createHelicopter(zPos) {
 
     // Position the group
     const startX = (Math.random() * (riverGeometry.parameters.width - helicopterBodySize.x)) - (riverGeometry.parameters.width / 2 - helicopterBodySize.x / 2);
-    helicopterGroup.position.set(startX, 3, zPos); // Start at a certain height above river
+    helicopterGroup.position.set(startX, 1, zPos); // Start at a certain height above river
 
     // Add custom data for movement and type
     helicopterGroup.userData = {
