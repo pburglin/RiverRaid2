@@ -118,8 +118,8 @@ window.addEventListener('resize', () => {
 // Player Controls
 const keyboardState = {};
 let playerSpeed = 10; // Units per second
-const accelerationSpeed = 20; // Units per second
-const decelerationRate = 5; // Units per second
+const accelerationSpeed = 5; // Units per second
+const decelerationRate = 2; // Units per second
 const movementBounds = 4.5; // Initial movement bounds, will be updated dynamically
 
 // Animation loop
@@ -163,7 +163,7 @@ function animate() {
     }
     if (keyboardState['ArrowUp']) {
         playerSpeed += accelerationSpeed * delta;
-        playerJet.position.y += 0.2 * delta;
+        //playerJet.position.y += 0.2 * delta;
     } else {
         playerSpeed -= decelerationRate * delta;
         playerSpeed = Math.max(10, playerSpeed);
@@ -502,7 +502,7 @@ function createHelicopter(zPos) {
 
     // Position the group
     const startX = (Math.random() * (riverGeometry.parameters.width - helicopterBodySize.x)) - (riverGeometry.parameters.width / 2 - helicopterBodySize.x / 2);
-    helicopterGroup.position.set(startX, 1, zPos); // Start at a certain height above river
+    helicopterGroup.position.set(startX, 0.01, zPos); // Start at a certain height above river
 
     // Add custom data for movement and type
     helicopterGroup.userData = {
