@@ -60,6 +60,8 @@ const fuelDisplay = document.getElementById('info');
 const scoreDisplay = document.getElementById('score');
 let score = 0;
 const enemyScoreValue = 10; // Points per enemy destroyed
+let distanceTraveled = 0;
+const scoreMultiplier = 0.1; // Adjust for desired score increase rate
 
 // Projectile Management
 const projectiles = [];
@@ -125,12 +127,16 @@ const movementBounds = 4.5; // Initial movement bounds, will be updated dynamica
 // Animation loop
 let gameOver = false;
 const clock = new THREE.Clock(); // Add clock for delta time calculation
+let gameTime = 0; // Time elapsed since game start
 const scrollSpeed = 5; // Units per second
 
 function animate() {
     requestAnimationFrame(animate);
 
     const delta = clock.getDelta(); // Time since last frame
+
+    // --- Update Distance Traveled ---
+    distanceTraveled += scrollSpeed * delta; // Assuming scrollSpeed is the forward speed
 
     // --- Camera and Player Forward Movement ---
     if (keyboardState['ArrowUp']) {
@@ -343,7 +349,13 @@ function animate() {
     playerFuel -= fuelConsumptionRate * delta;
     playerFuel = Math.max(0, playerFuel); // Prevent fuel going below 0
     fuelDisplay.textContent = `Fuel: ${Math.floor(playerFuel)}`;
-    scoreDisplay.textContent = `Score: ${score}`; // Update score display
+
+    // --- Score Calculation & Display ---
+    if (!gameOver) {
+        gameTime += delta;
+        score = Math.floor(gameTime * 10); // Score increases by 10 per second
+        scoreDisplay.textContent = `Score: ${score}`;
+    }
 
     // Check for game over (out of fuel)
     if (playerFuel <= 0) {
@@ -486,7 +498,6 @@ function createEnemyTurret(zPos) {
     // Place on left or right bank
     const side = Math.random() < 0.5 ? -1 : 1;
     const xPos = side * (riverGeometry.parameters.width / 2 + bankWidth / 2); // Position on the bank edge
-
     enemy.position.set(xPos, bankHeight + enemyTurretHeight / 2, zPos); // Place on top of the bank height
     enemy.userData = { speed: Math.random() * 5 + 2 }; // Random speed between 2 and 7
     scene.add(enemy);
@@ -558,7 +569,6 @@ function createProjectile() {
     projectile.position.copy(playerJet.position);
     // Adjust slightly forward if needed
     projectile.position.z -= 1; // Start slightly in front of the jet nose
-
     scene.add(projectile);
     projectiles.push(projectile);
 }
