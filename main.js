@@ -80,7 +80,7 @@ const depotMaterial = new THREE.MeshStandardMaterial({ color: 0xffa500 }); // Or
 const enemies = [];
 const enemyTurretRadius = 0.4;
 const enemyTurretHeight = 0.8;
-const enemySpacing = 25; // How often enemies appear
+const enemySpacing = 15; // How often enemies appear
 let nextEnemyZ = -30;
 const enemyMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 }); // Grey color
 
@@ -481,10 +481,10 @@ function createEnemyTurret(zPos) {
     const xPos = side * (riverGeometry.parameters.width / 2 + bankWidth / 2); // Position on the bank edge
 
     enemy.position.set(xPos, bankHeight + enemyTurretHeight / 2, zPos); // Place on top of the bank height
+    enemy.userData = { speed: Math.random() * 5 + 2 }; // Random speed between 2 and 7
     scene.add(enemy);
     enemies.push(enemy);
 }
-
 // Function to create a helicopter enemy
 function createHelicopter(zPos) {
     const helicopterGroup = new THREE.Group(); // Use a group to hold body and rotor
@@ -508,7 +508,8 @@ function createHelicopter(zPos) {
     // Add custom data for movement and type
     helicopterGroup.userData = {
         type: 'helicopter',
-        direction: Math.random() < 0.5 ? 1 : -1 // Start moving left or right
+        direction: Math.random() < 0.5 ? 1 : -1, // Start moving left or right
+        speed: Math.random() * 4 + 2 // Random speed between 2 and 6
     };
 
     scene.add(helicopterGroup);
