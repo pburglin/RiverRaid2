@@ -63,7 +63,7 @@ const enemyScoreValue = 10; // Points per enemy destroyed
 
 // Projectile Management
 const projectiles = [];
-const projectileSpeed = 20;
+const projectileSpeed = 25;
 const projectileRadius = 0.1;
 const projectileHeight = 0.5;
 const projectileMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00 }); // Yellow
@@ -80,12 +80,12 @@ const depotMaterial = new THREE.MeshStandardMaterial({ color: 0xffa500 }); // Or
 const enemies = [];
 const enemyTurretRadius = 0.4;
 const enemyTurretHeight = 0.8;
-const enemySpacing = 15; // How often enemies appear
+const enemySpacing = 10; // How often enemies appear
 let nextEnemyZ = -30;
 const enemyMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 }); // Grey color
 
 // Helicopter Enemy Specifics
-const helicopterSpeed = 3; // Horizontal speed
+const helicopterSpeed = 10; // Horizontal speed
 const helicopterBodySize = { x: 1.5, y: 0.01, z: 0.8 };
 const helicopterRotorRadius = 1;
 const helicopterMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa }); // Lighter grey
@@ -117,12 +117,13 @@ window.addEventListener('resize', () => {
 
 // Player Controls
 const keyboardState = {};
-let playerSpeed = 10; // Units per second
-const accelerationSpeed = 5; // Units per second
-const decelerationRate = 2; // Units per second
+let playerSpeed = 22; // Units per second
+const accelerationSpeed = 2; // Units per second
+const decelerationRate = 1; // Units per second
 const movementBounds = 4.5; // Initial movement bounds, will be updated dynamically
 
 // Animation loop
+let gameOver = false;
 const clock = new THREE.Clock(); // Add clock for delta time calculation
 const scrollSpeed = 5; // Units per second
 
@@ -166,7 +167,7 @@ function animate() {
         //playerJet.position.y += 0.2 * delta;
     } else {
         playerSpeed -= decelerationRate * delta;
-        playerSpeed = Math.max(10, playerSpeed);
+        playerSpeed = Math.max(20, playerSpeed);
     }
 
     playerJet.position.z -= playerSpeed * delta;
@@ -349,6 +350,7 @@ function animate() {
         console.log("Game Over - Out of Fuel!");
         fuelDisplay.textContent = "Game Over - Out of Fuel!";
         clock.stop(); // Stop the game loop
+        gameOver = true;
         // TODO: Add a more formal game over screen/state
         return; // Stop further processing in this frame
     }
@@ -356,9 +358,9 @@ function animate() {
     // Other game logic updates will go here
 
     // --- Projectile Movement, Collision & Removal ---
-    projectileLoop: for (let i = projectiles.length - 1; i >= 0; i--) { // Added label
+    projectileLoop: for (let i = projectiles.length - 1; i >= 0; i--) {
         const projectile = projectiles[i];
-        projectile.position.z -= projectileSpeed * delta; // Move forward (negative Z)
+        projectile.position.z -= projectileSpeed * delta;
 
         // Check Projectile-Enemy Collision
         const projectileBox = new THREE.Box3().setFromObject(projectile);
@@ -425,12 +427,12 @@ function animate() {
             }
         }
 
-
         // Remove projectiles that go far off-screen (ahead of the camera)
-        if (projectile.position.z < camera.position.z - 100) { // Adjust threshold as needed
+        if (projectile.position.z < camera.position.z - 100 || gameOver) { // Adjust threshold as needed
             scene.remove(projectile);
             projectile.geometry.dispose();
             projectiles.splice(i, 1);
+            continue projectileLoop; // Skip further checks for this projectile
         }
     }
 
@@ -446,15 +448,20 @@ console.log("Three.js scene initialized.");
 function createBankPair(zPos, currentRiverWidth) {
     const bankGeometry = new THREE.BoxGeometry(bankWidth, bankHeight, bankDepth);
 
+    // Calculate a curve offset using a sine wave
+    const curveAmplitude = 2; // Adjust for the intensity of the curve
+    const curveFrequency = 0.1; // Adjust for the frequency of the curve
+    const xOffset = Math.sin(zPos * curveFrequency) * curveAmplitude;
+
     // Left bank
     const leftBank = new THREE.Mesh(bankGeometry, bankMaterial);
-    leftBank.position.set(-(currentRiverWidth / 2 + bankWidth / 2), bankHeight / 2, zPos); // Corrected bank position
+    leftBank.position.set(-(currentRiverWidth / 2 + bankWidth / 2) + xOffset, bankHeight / 2, zPos); // Corrected bank position
     scene.add(leftBank);
     banks.push(leftBank);
 
     // Right bank
     const rightBank = new THREE.Mesh(bankGeometry, bankMaterial);
-    rightBank.position.set((currentRiverWidth / 2 + bankWidth / 2), bankHeight / 2, zPos); // Corrected bank position
+    rightBank.position.set((currentRiverWidth / 2 + bankWidth / 2) - xOffset, bankHeight / 2, zPos); // Corrected bank position
     scene.add(rightBank);
     banks.push(rightBank);
 }
@@ -537,7 +544,7 @@ window.addEventListener('keyup', (event) => {
 
 // Add listener for firing projectiles
 window.addEventListener('keydown', (event) => {
-    if (event.code === 'Space' && clock.running) { // Only fire if game is running
+    if (event.code === 'Space' && clock.running && !gameOver && projectiles.length === 0) { // Only fire if game is running and no projectile exists
         createProjectile();
     }
 });
