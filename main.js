@@ -59,7 +59,7 @@ const fuelReplenishAmount = 25;
 const fuelDisplay = document.getElementById('info');
 const scoreDisplay = document.getElementById('score');
 let score = 0;
-const enemyScoreValue = 100; // Points per enemy destroyed
+const enemyScoreValue = 50; // Points per enemy destroyed
 let distanceTraveled = 0;
 const scoreMultiplier = 0.1; // Adjust for desired score increase rate
 
@@ -91,7 +91,7 @@ const helicopterSpeed = 10; // Horizontal speed
 const helicopterBodySize = { x: 1.5, y: 0.01, z: 0.8 };
 const helicopterRotorRadius = 1;
 const helicopterMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa }); // Lighter grey
-const helicopterScoreValue = 25; // Points for destroying a helicopter
+const helicopterScoreValue = 100; // Points for destroying a helicopter
 
 // Bridge Management
 const bridges = [];
@@ -353,7 +353,7 @@ function animate() {
     // --- Score Calculation & Display ---
     if (!gameOver) {
         gameTime += delta;
-        score = Math.floor(gameTime * 10); // Score increases by 10 per second
+        score += Math.floor(gameTime / 100); // Score increases by 10 per second
         scoreDisplay.textContent = `Score: ${score}`;
     }
 
@@ -406,7 +406,7 @@ function animate() {
                 } else { // Assume turret otherwise
                     score += enemyScoreValue;
                 }
-                scoreDisplay.textContent = `Score: ${score}`; // Update score display
+                scoreDisplay.textContent = `Score: ${score}`;
 
                 // Since projectile is gone, continue to next projectile
                 continue projectileLoop;
@@ -433,7 +433,6 @@ function animate() {
                 // Add score
                 score += bridgeScoreValue;
                 scoreDisplay.textContent = `Score: ${score}`;
-
                 // Since projectile is gone, continue to next projectile
                 continue projectileLoop;
             }
