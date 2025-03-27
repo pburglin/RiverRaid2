@@ -2,7 +2,9 @@ import * as THREE from 'three';
 
 // Scene setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB); // Sky blue background
+const originalBackgroundColor = new THREE.Color(0x87CEEB); // Sky blue background
+scene.background = originalBackgroundColor.clone();
+let flashTimeout = null; // To manage the flash effect timeout
 
 // Camera setup
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -60,8 +62,13 @@ const fuelDisplay = document.getElementById('info');
 const scoreDisplay = document.getElementById('score');
 let score = 0;
 const enemyScoreValue = 50; // Points per enemy destroyed
+const turretScoreValue = 50; // Using enemyScoreValue for turrets now
 let distanceTraveled = 0;
-const scoreMultiplier = 0.1; // Adjust for desired score increase rate
+const distanceScoreMultiplier = 1; // Points per unit of distance traveled
+
+// Game Speed Management
+let gameSpeedMultiplier = 1.0;
+const speedIncreaseFactor = 0.0001; // How much speed increases per unit of distance
 
 // Projectile Management
 const projectiles = [];
@@ -135,14 +142,20 @@ function animate() {
 
     const delta = clock.getDelta(); // Time since last frame
 
+    // --- Update Game Speed Multiplier ---
+    gameSpeedMultiplier = 1.0 + distanceTraveled * speedIncreaseFactor;
+    const currentScrollSpeed = scrollSpeed * gameSpeedMultiplier;
+
     // --- Update Distance Traveled ---
-    distanceTraveled += scrollSpeed * delta; // Assuming scrollSpeed is the forward speed
+    const frameSpeed = keyboardState['ArrowUp'] ? (currentScrollSpeed + playerSpeed) : currentScrollSpeed;
+    distanceTraveled += frameSpeed * delta; // Use total speed including player acceleration
 
     // --- Camera and Player Forward Movement ---
     if (keyboardState['ArrowUp']) {
-        camera.position.z -= (scrollSpeed + playerSpeed) * delta;
+        // Player speed adds on top of the base scroll speed
+        camera.position.z -= (currentScrollSpeed + playerSpeed) * delta;
     } else {
-        camera.position.z -= scrollSpeed * delta;
+        camera.position.z -= currentScrollSpeed * delta;
     }
     playerJet.position.z = camera.position.z - 5; // Keep player fixed distance in front of camera
     camera.lookAt(playerJet.position.x, playerJet.position.y, playerJet.position.z - 10); // Look ahead of the player
@@ -256,6 +269,16 @@ function animate() {
                 rotor.rotation.y += 15 * delta; // Spin the rotor
             }
         }
+        // Turret specific logic: Firing
+        else if (enemy.userData.type === 'turret' && !gameOver) {
+            const currentTime = clock.getElapsedTime();
+            // Check if enough time has passed since last shot and player is within range
+            const distanceToPlayer = playerJet.position.distanceTo(enemy.position);
+            if (currentTime - enemy.userData.lastFiredTime > enemyFireRate && distanceToPlayer < 50) { // Fire if player is within 50 units
+                createEnemyProjectile(enemy);
+            }
+        }
+
 
         // Remove enemies that are far behind the camera
         if (enemy.position.z > camera.position.z + 20) {
@@ -351,10 +374,87 @@ function animate() {
     fuelDisplay.textContent = `Fuel: ${Math.floor(playerFuel)}`;
 
     // --- Score Calculation & Display ---
+    // Score is now calculated based on distance traveled and enemy/bridge destruction
+    // We'll update the display here, but the score itself is incremented elsewhere (distance) or on events (destruction)
+    let currentScore = Math.floor(distanceTraveled * distanceScoreMultiplier); // Base score from distance
+
+    // Add scores from destroyed items (this part is handled in collision logic)
+    // The 'score' variable accumulates points from destruction events.
+    // We need to combine distance score with destruction score for the display.
+    // Let's adjust how score is managed. 'score' will hold destruction points.
+
+    // Re-thinking: Let's make 'score' the single source of truth.
+    // We'll calculate the *increase* in distance score since the last frame.
+    // This requires storing the previous distance score.
+
+    // Simpler approach: Calculate total score based on current distance + accumulated destruction points.
+    // Let's rename the global 'score' to 'destructionScore' and calculate total score here.
+
+    // --- Let's stick to the original plan: 'score' is the total score. ---
+    // We need to calculate the score based on distance *incrementally* or recalculate total each frame.
+    // Recalculating is simpler.
+
     if (!gameOver) {
-        gameTime += delta;
-        score += Math.floor(gameTime / 100); // Score increases by 10 per second
-        scoreDisplay.textContent = `Score: ${score}`;
+        // Calculate score based on distance traveled so far
+        const distanceScore = Math.floor(distanceTraveled * distanceScoreMultiplier);
+        // Add points from destroyed enemies/bridges (which are added to 'score' directly)
+        // So, the displayed score should be distanceScore + points already added to 'score' from destruction.
+        // Let's refine this. 'score' should be the TOTAL score.
+        // We'll add distance points incrementally.
+
+        // Let's store the score from the previous frame to calculate the delta.
+        // Need a variable outside the loop, e.g., `lastDistanceScore = 0;`
+        // Inside loop:
+        // currentDistanceScore = Math.floor(distanceTraveled * distanceScoreMultiplier);
+        // score += (currentDistanceScore - lastDistanceScore);
+        // lastDistanceScore = currentDistanceScore;
+
+        // --- Revised Simpler Approach: Recalculate total score each frame ---
+        // 'score' will store points from destruction. We calculate total here.
+        let destructionScore = score; // Keep track of points from hits separately for clarity
+        let totalScore = Math.floor(distanceTraveled * distanceScoreMultiplier) + destructionScore;
+        scoreDisplay.textContent = `Score: ${totalScore}`; // Display the combined score
+
+        // Wait, the original request was to *fix* the score logic.
+        // The existing logic adds destruction score correctly.
+        // The issue is the time-based score. Let's replace that with distance-based score.
+        // We need to ensure destruction points are *added* to the distance score.
+
+        // Let's try this:
+        // 1. Calculate the base score from distance.
+        // 2. Add destruction points (already stored in `score`) to this base for display.
+        // This seems overly complex. Let's make `score` the single source of truth.
+
+        // --- Final Approach: ---
+        // Initialize score = 0.
+        // In collision: score += enemyScoreValue / bridgeScoreValue.
+        // In animate loop: Calculate the *increase* in distance score since last frame and add it to `score`.
+
+        // Need a variable outside: let lastDistanceScore = 0;
+        // Inside animate:
+        const currentDistanceScore = Math.floor(distanceTraveled * distanceScoreMultiplier);
+        // Add the difference from the last frame's distance score
+        // This requires `lastDistanceScore` to be defined outside the function scope.
+        // Let's define it near the `score` variable.
+
+        // Assuming `lastDistanceScore` is defined globally like `score`:
+        // score += (currentDistanceScore - lastDistanceScore); // Add distance increment
+        // lastDistanceScore = currentDistanceScore; // Update for next frame
+        // scoreDisplay.textContent = `Score: ${score}`; // Display total accumulated score
+
+        // --- Let's implement this ---
+        // First, add `lastDistanceScore` globally. (Will do this in the next step)
+        // For now, modify this block assuming `lastDistanceScore` exists.
+
+        // --- Reverting to simpler: Calculate total score based on current distance ---
+        // The score variable will accumulate destruction points.
+        // The display will show distance points + destruction points.
+        // This avoids needing `lastDistanceScore`.
+
+        const distancePoints = Math.floor(distanceTraveled * distanceScoreMultiplier);
+        // 'score' holds destruction points. Display total.
+        scoreDisplay.textContent = `Score: ${distancePoints + score}`; // Display combined score
+
     }
 
     // Check for game over (out of fuel)
@@ -382,6 +482,7 @@ function animate() {
 
             if (projectileBox.intersectsBox(enemyBox)) {
                 console.log("Enemy hit!");
+                triggerExplosionFlash(); // Trigger flash effect
                 // Remove projectile
                 scene.remove(projectile);
                 projectile.geometry.dispose();
@@ -420,6 +521,7 @@ function animate() {
 
             if (projectileBox.intersectsBox(bridgeBox)) {
                 console.log("Bridge hit!");
+                triggerExplosionFlash(); // Trigger flash effect
                 // Remove projectile
                 scene.remove(projectile);
                 projectile.geometry.dispose();
@@ -444,6 +546,39 @@ function animate() {
             projectile.geometry.dispose();
             projectiles.splice(i, 1);
             continue projectileLoop; // Skip further checks for this projectile
+        }
+    }
+
+    // --- Enemy Projectile Movement, Collision & Removal ---
+    enemyProjectileLoop: for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+        const projectile = enemyProjectiles[i];
+        const direction = projectile.userData.direction;
+
+        // Move projectile based on its stored direction
+        projectile.position.addScaledVector(direction, enemyProjectileSpeed * delta);
+
+        // Check Enemy Projectile - Player Collision
+        const projectileBox = new THREE.Box3().setFromObject(projectile);
+        if (playerBox.intersectsBox(projectileBox) && !gameOver) {
+            console.log("Game Over - Hit by Enemy Projectile!");
+            fuelDisplay.textContent = "Game Over - Hit by Enemy!"; // Use fuel display
+            clock.stop();
+            gameOver = true;
+
+            // Remove the projectile that hit the player
+            scene.remove(projectile);
+            projectile.geometry.dispose();
+            enemyProjectiles.splice(i, 1);
+
+            return; // Stop further processing in this frame
+        }
+
+        // Remove projectiles that go far off-screen or if game over
+        if (projectile.position.z < camera.position.z - 100 || projectile.position.z > camera.position.z + 20 || gameOver) {
+            scene.remove(projectile);
+            projectile.geometry.dispose();
+            enemyProjectiles.splice(i, 1);
+            continue enemyProjectileLoop;
         }
     }
 
@@ -496,9 +631,15 @@ function createEnemyTurret(zPos) {
 
     // Place on left or right bank
     const side = Math.random() < 0.5 ? -1 : 1;
-    const xPos = side * (riverGeometry.parameters.width / 2 + bankWidth / 2); // Position on the bank edge
+    // Position on the bank edge, considering current river width might be better
+    // Let's use the fixed riverGeometry width for now as banks aren't dynamically resizing yet
+    const xPos = side * (riverGeometry.parameters.width / 2 + bankWidth / 2);
     enemy.position.set(xPos, bankHeight + enemyTurretHeight / 2, zPos); // Place on top of the bank height
-    enemy.userData = { speed: Math.random() * 5 + 2 }; // Random speed between 2 and 7
+    enemy.userData = {
+        type: 'turret',
+        lastFiredTime: 0, // Initialize last fired time
+        speed: Math.random() * 5 + 2 // Keep existing random speed if needed later
+    };
     scene.add(enemy);
     enemies.push(enemy);
 }
@@ -570,4 +711,35 @@ function createProjectile() {
     projectile.position.z -= 1; // Start slightly in front of the jet nose
     scene.add(projectile);
     projectiles.push(projectile);
+}
+
+// Function to create an enemy projectile
+function createEnemyProjectile(turret) {
+    const projectileGeometry = new THREE.CylinderGeometry(enemyProjectileRadius, enemyProjectileRadius, enemyProjectileHeight, 8);
+    const projectile = new THREE.Mesh(projectileGeometry, enemyProjectileMaterial);
+
+    // Start projectile at the turret's position
+    projectile.position.copy(turret.position);
+    // Aim towards the player's current position
+    const direction = new THREE.Vector3();
+    direction.subVectors(playerJet.position, turret.position).normalize();
+
+    projectile.userData = { direction: direction }; // Store direction for movement
+    scene.add(projectile);
+    enemyProjectiles.push(projectile);
+
+    // Update turret's last fired time
+    turret.userData.lastFiredTime = clock.getElapsedTime();
+}
+
+// Function to trigger background flash for explosions
+function triggerExplosionFlash() {
+    if (flashTimeout) {
+        clearTimeout(flashTimeout); // Clear existing timeout if flashing rapidly
+    }
+    scene.background = new THREE.Color(0xffffff); // White flash
+    flashTimeout = setTimeout(() => {
+        scene.background = originalBackgroundColor.clone(); // Revert to original color
+        flashTimeout = null;
+    }, 100); // Flash duration in milliseconds (e.g., 100ms)
 }
