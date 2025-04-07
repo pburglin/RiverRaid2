@@ -3,7 +3,9 @@ import * as THREE from 'three';
 // Scene setup
 const scene = new THREE.Scene();
 const originalBackgroundColor = new THREE.Color(0x87CEEB); // Sky blue background
+const groundColor = new THREE.Color(0xD2B48C); // Pastel Brown for ground
 scene.background = originalBackgroundColor.clone();
+// Removed fog
 let flashTimeout = null; // To manage the flash effect timeout
 
 // Camera setup
@@ -45,11 +47,21 @@ riverPlane.rotation.x = -Math.PI / 2; // Rotate to be horizontal
 riverPlane.position.y = 0; // Position at y=0
 scene.add(riverPlane);
 
+// Ground Plane (below the river)
+const groundGeometry = new THREE.PlaneGeometry(1000, 1000); // Very large plane
+const groundMaterial = new THREE.MeshStandardMaterial({ color: groundColor, side: THREE.DoubleSide });
+const groundPlane = new THREE.Mesh(groundGeometry, groundMaterial);
+groundPlane.rotation.x = -Math.PI / 2; // Rotate to be horizontal
+groundPlane.position.y = -0.1; // Position slightly below the river
+scene.add(groundPlane);
+
+
 // River Bank Management
 const banks = [];
 const bankWidth = 1;
 const bankHeight = 2;
 const bankDepth = 5; // Length along the river
+
 const bankSpacing = 10; // Distance between bank segments along the river
 let nextBankZ = -20; // Position where the next bank pair should be generated
 const bankMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 }); // Green color
@@ -177,6 +189,8 @@ function animate() {
 
     // Keep river plane centered under the camera view
     riverPlane.position.z = camera.position.z - 50; // Adjust offset as needed
+    // Keep ground plane centered under the camera view as well
+    groundPlane.position.z = camera.position.z - 50; // Match river plane's Z offset
 
     // Player Horizontal Movement Logic
     if (keyboardState['ArrowLeft'] || keyboardState['KeyA']) {
@@ -807,4 +821,8 @@ function triggerExplosionFlash() {
         scene.background = originalBackgroundColor.clone(); // Revert to original color
         flashTimeout = null;
     }, 100); // Flash duration in milliseconds (e.g., 100ms)
+
+    // Removed fog color check
 }
+
+// Removed duplicate function definition that was here
