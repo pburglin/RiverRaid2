@@ -12,7 +12,7 @@ This is a simple clone of the classic Atari game River Raid, implemented using H
 
 ## Netlify Online Deploy
 
-Access the game here: `https://riverraid2b.netlify.app`
+Access the game here: [https://riverraid2b.netlify.app](https://riverraid2b.netlify.app)
 
 ## Running the Game Locally
 
