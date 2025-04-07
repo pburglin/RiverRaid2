@@ -60,11 +60,14 @@ const fuelConsumptionRate = 2; // Units per second
 const fuelReplenishAmount = 25;
 const fuelDisplay = document.getElementById('info');
 const scoreDisplay = document.getElementById('score');
-let score = 0;
+let score = 0; // Accumulates points from destruction
 const enemyScoreValue = 50; // Points per enemy destroyed
 const turretScoreValue = 50; // Using enemyScoreValue for turrets now
+const fuelDepotScoreValue = 25; // Points for destroying a fuel depot
 let distanceTraveled = 0;
 const distanceScoreMultiplier = 1; // Points per unit of distance traveled
+const HIGH_SCORE_KEY = 'riverRaidHighScore';
+let highScore = parseInt(localStorage.getItem(HIGH_SCORE_KEY) || '0');
 
 // Game Speed Management
 let gameSpeedMultiplier = 1.0;
@@ -84,6 +87,7 @@ const depotHeight = 0.5;
 const depotSpacing = 50; // How often fuel depots appear along the river
 let nextDepotZ = -40; // Position for the next fuel depot
 const depotMaterial = new THREE.MeshStandardMaterial({ color: 0xffa500 }); // Orange color
+depotMaterial.name = "FuelDepotMaterial"; // Add name for identification if needed
 
 // Enemy Management
 const enemies = [];
@@ -320,33 +324,34 @@ function animate() {
         const bankBox = new THREE.Box3().setFromObject(bank);
         if (playerBox.intersectsBox(bankBox)) {
             console.log("Game Over - Hit Bank!");
-            fuelDisplay.textContent = "Game Over - Hit Bank!";
-            clock.stop(); // Stop the game loop
-            // TODO: Add a more formal game over screen/state
+            handleGameOver("Hit Bank!");
             return; // Stop further processing in this frame
         }
     }
 
     // Check collision with Enemies
     for (const enemy of enemies) {
-        const enemyBox = new THREE.Box3().setFromObject(enemy);
-        if (playerBox.intersectsBox(enemyBox) && scene.children.includes(enemy)) {
-            console.log("Game Over - Hit Enemy!");
-            fuelDisplay.textContent = "Game Over - Hit Enemy!"; // Use fuel display for game over message
-            clock.stop(); // Stop the game loop
-            return; // Stop further processing in this frame
-
+        // Ensure enemy is still in the scene before checking collision
+        if (scene.children.includes(enemy)) {
+            const enemyBox = new THREE.Box3().setFromObject(enemy);
+            if (playerBox.intersectsBox(enemyBox)) {
+                console.log("Game Over - Hit Enemy!");
+                handleGameOver("Hit Enemy!");
+                return; // Stop further processing in this frame
+            }
         }
     }
 
     // Check collision with Bridges
     for (const bridge of bridges) {
-        const bridgeBox = new THREE.Box3().setFromObject(bridge);
-        if (playerBox.intersectsBox(bridgeBox)) {
-            console.log("Game Over - Hit Bridge!");
-            fuelDisplay.textContent = "Game Over - Hit Bridge!"; // Use fuel display for game over message
-            clock.stop(); // Stop the game loop
-            return; // Stop further processing in this frame
+        // Ensure bridge is still in the scene before checking collision
+        if (scene.children.includes(bridge)) {
+            const bridgeBox = new THREE.Box3().setFromObject(bridge);
+            if (playerBox.intersectsBox(bridgeBox)) {
+                console.log("Game Over - Hit Bridge!");
+                handleGameOver("Hit Bridge!");
+                return; // Stop further processing in this frame
+            }
         }
     }
 
@@ -452,18 +457,20 @@ function animate() {
         // This avoids needing `lastDistanceScore`.
 
         const distancePoints = Math.floor(distanceTraveled * distanceScoreMultiplier);
-        // 'score' holds destruction points. Display total.
-        scoreDisplay.textContent = `Score: ${distancePoints + score}`; // Display combined score
+        // 'score' holds destruction points.
+        const currentTotalScore = distancePoints + score;
+        scoreDisplay.textContent = `Score: ${currentTotalScore} | High: ${highScore}`; // Display combined score and high score
 
+    } else {
+        // If game is over, ensure the final score is displayed correctly
+        const finalScore = Math.floor(distanceTraveled * distanceScoreMultiplier) + score;
+        scoreDisplay.textContent = `Score: ${finalScore} | High: ${highScore}`;
     }
 
     // Check for game over (out of fuel)
-    if (playerFuel <= 0) {
+    if (playerFuel <= 0 && !gameOver) { // Check !gameOver to prevent multiple calls
         console.log("Game Over - Out of Fuel!");
-        fuelDisplay.textContent = "Game Over - Out of Fuel!";
-        clock.stop(); // Stop the game loop
-        gameOver = true;
-        // TODO: Add a more formal game over screen/state
+        handleGameOver("Out of Fuel!");
         return; // Stop further processing in this frame
     }
 
@@ -505,12 +512,12 @@ function animate() {
                 if (enemy.userData.type === 'helicopter') {
                     score += helicopterScoreValue;
                 } else { // Assume turret otherwise
-                    score += enemyScoreValue;
+                    score += enemyScoreValue; // Add turret score
                 }
-                scoreDisplay.textContent = `Score: ${score}`;
+                // Score display is updated later in the loop
 
                 // Since projectile is gone, continue to next projectile
-                continue projectileLoop;
+                continue projectileLoop; // Move to the next projectile
             }
         }
 
@@ -534,9 +541,39 @@ function animate() {
 
                 // Add score
                 score += bridgeScoreValue;
-                scoreDisplay.textContent = `Score: ${score}`;
+                // Score display is updated later in the loop
                 // Since projectile is gone, continue to next projectile
-                continue projectileLoop;
+                continue projectileLoop; // Move to the next projectile
+            }
+        }
+
+        // Check Projectile-Fuel Depot Collision
+        for (let l = fuelDepots.length - 1; l >= 0; l--) {
+            const depot = fuelDepots[l];
+            // Ensure depot is still in the scene
+            if (!scene.children.includes(depot)) continue;
+
+            const depotBox = new THREE.Box3().setFromObject(depot);
+            if (projectileBox.intersectsBox(depotBox)) {
+                console.log("Fuel depot destroyed!");
+                triggerExplosionFlash(); // Trigger flash effect
+
+                // Remove projectile
+                scene.remove(projectile);
+                projectile.geometry.dispose();
+                projectiles.splice(i, 1);
+
+                // Remove fuel depot
+                scene.remove(depot);
+                depot.geometry.dispose();
+                fuelDepots.splice(l, 1);
+
+                // Add score for destroying depot
+                score += fuelDepotScoreValue;
+                // Score display is updated later in the loop
+
+                // Since projectile is gone, continue to next projectile
+                continue projectileLoop; // Move to the next projectile
             }
         }
 
@@ -561,9 +598,7 @@ function animate() {
         const projectileBox = new THREE.Box3().setFromObject(projectile);
         if (playerBox.intersectsBox(projectileBox) && !gameOver) {
             console.log("Game Over - Hit by Enemy Projectile!");
-            fuelDisplay.textContent = "Game Over - Hit by Enemy!"; // Use fuel display
-            clock.stop();
-            gameOver = true;
+            handleGameOver("Hit by Enemy!");
 
             // Remove the projectile that hit the player
             scene.remove(projectile);
@@ -586,9 +621,39 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-animate();
+// --- Game Over Handling ---
+function handleGameOver(reason) {
+    if (gameOver) return; // Prevent multiple calls
 
+    gameOver = true;
+    clock.stop(); // Stop the game loop
+
+    const finalDistanceScore = Math.floor(distanceTraveled * distanceScoreMultiplier);
+    const finalTotalScore = finalDistanceScore + score; // Combine distance and destruction points
+
+    fuelDisplay.textContent = `Game Over - ${reason}! Final Score: ${finalTotalScore}`; // Show reason and final score
+
+    // Update High Score
+    if (finalTotalScore > highScore) {
+        highScore = finalTotalScore;
+        localStorage.setItem(HIGH_SCORE_KEY, highScore.toString());
+        console.log(`New High Score: ${highScore}`);
+    }
+    // Update score display one last time to show final score and potentially updated high score
+    scoreDisplay.textContent = `Score: ${finalTotalScore} | High: ${highScore}`;
+
+    // Optional: Add a restart mechanism here or display a message
+}
+
+
+// --- Initialization ---
 console.log("Three.js scene initialized.");
+console.log(`Loaded High Score: ${highScore}`);
+scoreDisplay.textContent = `Score: 0 | High: ${highScore}`; // Initial score display
+animate(); // Start the animation loop
+
+
+// --- Object Creation Functions ---
 
 // Function to create a pair of river banks with a specific width
 function createBankPair(zPos, currentRiverWidth) {
