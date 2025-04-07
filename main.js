@@ -24,6 +24,11 @@ const minRiverWidth = 5;
 const maxRiverWidth = 15;
 const widthChangeFrequency = 0.01; // How quickly the width changes relative to Z distance
 
+// River Center Offset Management
+let riverCenterXOffset = 0; // Starting center offset
+const maxRiverCenterOffset = 3; // How far the center can shift left/right
+const centerOffsetFrequency = 0.005; // How quickly the center shifts (slower than width change)
+
 // Basic lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
@@ -176,18 +181,27 @@ function animate() {
     playerJet.position.z = camera.position.z - 5; // Keep player fixed distance in front of camera
     camera.lookAt(playerJet.position.x, playerJet.position.y, playerJet.position.z - 10); // Look ahead of the player
 
-    // --- River Width Calculation (using sine wave for simplicity) ---
-    // Use absolute Z position for consistent width change
+    // --- River Width & Center Calculation ---
+    // Use absolute Z position for consistent changes
     const widthFactor = (Math.sin(camera.position.z * widthChangeFrequency) + 1) / 2; // Normalize sine output to 0-1
     currentRiverWidth = minRiverWidth + widthFactor * (maxRiverWidth - minRiverWidth);
+    // Calculate horizontal shift for the river center
+    riverCenterXOffset = Math.sin(camera.position.z * centerOffsetFrequency) * maxRiverCenterOffset;
 
     // Update river plane width (optional, could just use banks to define width visually)
     // riverPlane.scale.x = currentRiverWidth / 10; // Assuming initial geometry width was 10
+    // Update river plane position to match the center offset
+    riverPlane.position.x = riverCenterXOffset;
+    // Update ground plane position to match the center offset
+    groundPlane.position.x = riverCenterXOffset;
 
-    // Update player movement bounds based on current width
-    const currentMovementBounds = currentRiverWidth / 2 - 0.5; // Half width minus buffer
 
-    // Keep river plane centered under the camera view
+    // Update player movement bounds based on current width and center offset
+    const halfWidth = currentRiverWidth / 2 - 0.5; // Half width minus buffer
+    const minPlayerX = riverCenterXOffset - halfWidth;
+    const maxPlayerX = riverCenterXOffset + halfWidth;
+
+    // Keep river plane centered under the camera view (Z only)
     riverPlane.position.z = camera.position.z - 50; // Adjust offset as needed
     // Keep ground plane centered under the camera view as well
     groundPlane.position.z = camera.position.z - 50; // Match river plane's Z offset
@@ -209,13 +223,14 @@ function animate() {
 
     playerJet.position.z -= playerSpeed * delta;
 
-    // Clamp player position within bounds
-    playerJet.position.x = Math.max(-currentMovementBounds, Math.min(currentMovementBounds, playerJet.position.x));
+    // Clamp player position within the shifting bounds
+    playerJet.position.x = Math.max(minPlayerX, Math.min(maxPlayerX, playerJet.position.x));
 
     // Bank Generation and Management
     // Generate new banks if needed (ahead of the camera's Z position)
     if (camera.position.z < nextBankZ + 50) { // Generate banks when camera approaches the next spawn point
-        createBankPair(nextBankZ, currentRiverWidth); // Pass current width
+        // Pass the current width AND the calculated center offset
+        createBankPair(nextBankZ, currentRiverWidth, riverCenterXOffset);
         nextBankZ -= bankSpacing; // Set Z for the *next* pair further down the river
     }
 
@@ -669,24 +684,24 @@ animate(); // Start the animation loop
 
 // --- Object Creation Functions ---
 
-// Function to create a pair of river banks with a specific width
-function createBankPair(zPos, currentRiverWidth) {
+// Function to create a pair of river banks with a specific width and center offset
+function createBankPair(zPos, currentRiverWidth, centerXOffset) {
     const bankGeometry = new THREE.BoxGeometry(bankWidth, bankHeight, bankDepth);
 
-    // Calculate a curve offset using a sine wave
+    // Calculate a curve offset using a sine wave (This adds local variation on top of the main center shift)
     const curveAmplitude = 2; // Adjust for the intensity of the curve
     const curveFrequency = 0.1; // Adjust for the frequency of the curve
     const xOffset = Math.sin(zPos * curveFrequency) * curveAmplitude;
 
-    // Left bank
+    // Left bank - position relative to the shifting center
     const leftBank = new THREE.Mesh(bankGeometry, bankMaterial);
-    leftBank.position.set(-(currentRiverWidth / 2 + bankWidth / 2) + xOffset, bankHeight / 2, zPos); // Corrected bank position
+    leftBank.position.set(centerXOffset - (currentRiverWidth / 2 + bankWidth / 2) + xOffset, bankHeight / 2, zPos);
     scene.add(leftBank);
     banks.push(leftBank);
 
-    // Right bank
+    // Right bank - position relative to the shifting center
     const rightBank = new THREE.Mesh(bankGeometry, bankMaterial);
-    rightBank.position.set((currentRiverWidth / 2 + bankWidth / 2) - xOffset, bankHeight / 2, zPos); // Corrected bank position
+    rightBank.position.set(centerXOffset + (currentRiverWidth / 2 + bankWidth / 2) - xOffset, bankHeight / 2, zPos);
     scene.add(rightBank);
     banks.push(rightBank);
 }
